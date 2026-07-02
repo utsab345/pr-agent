@@ -144,7 +144,7 @@ async def run_action():
                 "github_action_config.handle_push_trigger",
                 get_settings().get("github_app.handle_push_trigger", True),
             )
-            if not push_trigger:
+            if not is_true(push_trigger):
                 get_logger().info("Skipping action: synchronize (handle_push_trigger is disabled)")
                 return
             pr_url = event_payload.get("pull_request", {}).get("url")
@@ -152,7 +152,6 @@ async def run_action():
                 return
             before_sha = event_payload.get("before")
             after_sha = event_payload.get("after")
-            merge_commit_sha = event_payload.get("pull_request", {}).get("merge_commit_sha")
             if before_sha == after_sha:
                 return
             push_commands = get_settings().get("github_app.push_commands", [])
