@@ -139,6 +139,19 @@ async def run_action():
                     await PRReviewer(pr_url).run()
                 if auto_improve is None or is_true(auto_improve):
                     await PRCodeSuggestions(pr_url).run()
+        elif action == "synchronize":
+            if not get_settings().get("github_app.handle_push_trigger", False):
+                get_logger().info("Skipping action: synchronize (handle_push_trigger is disabled)")
+                return
+            pr_url = event_payload.get("pull_request", {}).get("url")
+            if not pr_url:
+                return
+            push_commands = get_settings().get("github_app.push_commands", ["/describe", "/review"])
+            get_settings().config.is_auto_command = True
+            get_settings().pr_description.final_update_message = False
+            get_logger().info(f"Running push commands: {push_commands}")
+            for command in push_commands:
+                await PRAgent().handle_request(pr_url, command)
         else:
             get_logger().info(f"Skipping action: {action}")
 
