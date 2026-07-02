@@ -6,6 +6,7 @@ These tests are deterministic and fake-provider based — no live API or
 network access is performed.
 """
 import asyncio
+import hashlib
 
 import pytest
 
@@ -431,7 +432,15 @@ class TestExtractAndCachePrTickets:
     ):
         settings_snapshot.set("pr_reviewer.require_ticket_analysis_review", True)
         cached = [{"ticket_id": 42, "title": "cached"}]
-        settings_snapshot.set("related_tickets", cached)
+        settings_snapshot.set("pr_reviewer.cache_tickets", True)
+
+        class _Provider:
+            pr_url = "https://github.com/org/repo/pull/42"
+
+        provider = _Provider()
+
+        cache_key = f'related_tickets_{hashlib.md5(provider.pr_url.encode()).hexdigest()}'
+        settings_snapshot.set(cache_key, cached)
 
         async def _boom(_):
             raise AssertionError("extract_tickets should not be called when cache is set")
@@ -439,15 +448,19 @@ class TestExtractAndCachePrTickets:
         monkeypatch.setattr(tpc, "extract_tickets", _boom)
 
         vars_ = {}
-        # Provider value irrelevant — should never be used
-        asyncio.run(extract_and_cache_pr_tickets(object(), vars_))
+        asyncio.run(extract_and_cache_pr_tickets(provider, vars_))
         assert vars_["related_tickets"] == cached
 
     def test_stores_sub_issues_before_main_issue_in_related_tickets(
         self, settings_snapshot, monkeypatch
     ):
         settings_snapshot.set("pr_reviewer.require_ticket_analysis_review", True)
-        settings_snapshot.set("related_tickets", [])
+        settings_snapshot.set("pr_reviewer.cache_tickets", True)
+
+        class _Provider:
+            pr_url = "https://github.com/org/repo/pull/99"
+
+        provider = _Provider()
 
         sub_a = {"ticket_url": "u/sub_a", "title": "sub_a", "body": "s1"}
         sub_b = {"ticket_url": "u/sub_b", "title": "sub_b", "body": "s2"}
@@ -466,13 +479,14 @@ class TestExtractAndCachePrTickets:
         monkeypatch.setattr(tpc, "extract_tickets", _fake_extract)
 
         vars_ = {}
-        asyncio.run(extract_and_cache_pr_tickets(object(), vars_))
+        asyncio.run(extract_and_cache_pr_tickets(provider, vars_))
 
         # Per current production order: sub-issues are appended first, then main.
         stored = vars_["related_tickets"]
         assert stored == [sub_a, sub_b, main_ticket]
-        # Settings cache is also populated
-        assert get_settings().get("related_tickets") == stored
+        # Settings cache is also populated under the PR-scoped key
+        cache_key = f'related_tickets_{hashlib.md5(provider.pr_url.encode()).hexdigest()}'
+        assert get_settings().get(cache_key) == stored
 
     def test_no_tickets_extracted_leaves_vars_untouched(
         self, settings_snapshot, monkeypatch
