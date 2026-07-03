@@ -149,7 +149,7 @@ class TestPRUpdateChangelog:
             mock_settings.return_value.pr_update_changelog.extra_instructions = ""
             mock_settings.return_value.pr_update_changelog_prompt.system = ""
             mock_settings.return_value.pr_update_changelog_prompt.user = ""
-            tool = PRUpdateChangelog("https://example.com/pr/123")
+            tool = PRUpdateChangelog("https://example.com/pr/123", ai_handler=lambda: mock_ai_handler)
 
             await tool.run()
 

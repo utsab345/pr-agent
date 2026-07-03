@@ -83,10 +83,6 @@ class PRUpdateChangelog:
                 )
             return
 
-        relevant_configs = {'pr_update_changelog': dict(get_settings().pr_update_changelog),
-                            'config': dict(get_settings().config)}
-        get_logger().debug("Relevant configs", artifacts=relevant_configs)
-
         if get_settings().config.publish_output:
             self.git_provider.publish_comment("Preparing changelog updates...", is_temporary=True)
 
