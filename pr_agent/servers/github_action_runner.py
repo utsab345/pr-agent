@@ -152,7 +152,7 @@ async def run_action():
                 return
             before_sha = event_payload.get("before")
             after_sha = event_payload.get("after")
-            if before_sha == after_sha:
+            if before_sha is not None and before_sha == after_sha:
                 return
             push_commands = get_settings().get("github_app.push_commands", [])
             if not push_commands:

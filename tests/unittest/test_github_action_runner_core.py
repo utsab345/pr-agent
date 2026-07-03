@@ -131,7 +131,7 @@ def restore_github_settings():
         settings.unset("GITHUB_APP", force=True)
 
 
-def _write_synchronize_event(tmp_path, before_sha="abc", after_sha="def", merge_commit_sha=None):
+def _write_synchronize_event(tmp_path, before_sha="abc", after_sha="def"):
     payload = {
         "action": "synchronize",
         "before": before_sha,
@@ -141,8 +141,6 @@ def _write_synchronize_event(tmp_path, before_sha="abc", after_sha="def", merge_
             "html_url": "https://github.com/org/repo/pull/1",
         },
     }
-    if merge_commit_sha:
-        payload["pull_request"]["merge_commit_sha"] = merge_commit_sha
     event_path = tmp_path / "event.json"
     event_path.write_text(json.dumps(payload))
     return event_path
@@ -258,7 +256,23 @@ async def test_synchronize_skips_equal_before_after_sha(monkeypatch, tmp_path, r
 
 
 @pytest.mark.asyncio
-async def test_synchronize_event_from_user_is_processed(monkeypatch, tmp_path, restore_github_settings):
+async def test_synchronize_event_triggers_push_commands_on_pull_request_target(monkeypatch, tmp_path, restore_github_settings):
+    handled = []
+    _patch_synchronize_deps(monkeypatch, handled, ["/describe", "/improve"])
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request_target")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(_write_synchronize_event(tmp_path)))
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+
+    await github_action_runner.run_action()
+
+    assert handled == [
+        ("https://api.github.com/repos/org/repo/pulls/1", "/describe"),
+        ("https://api.github.com/repos/org/repo/pulls/1", "/improve"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_issue_comment_from_user_is_processed(monkeypatch, tmp_path, restore_github_settings):
     """The bot guard must not over-skip: a human comment is still handled."""
     handled = []
     _patch_issue_comment_deps(monkeypatch, handled)
