@@ -188,15 +188,9 @@ If not set, the default configuration is for all three tools to run automaticall
 
 `github_action_config.pr_actions` is used to configure which `pull_requests` events will trigger the enabled auto flags
 If not set, the default configuration is `["opened", "reopened", "ready_for_review", "review_requested"]`
+Adding `"synchronize"` to this list enables auto tools on new commits pushed to an open PR. You must also add `synchronize` to the workflow `pull_request: types:` list.
 
-Adding `"synchronize"` to `pr_actions` enables automatic tools on new commits pushed to an open PR. You must also add `synchronize` to the workflow `pull_request: types:` list.
-
-`github_action_config.pr_actions` is used to configure which `pull_requests` events will trigger the enabled auto flags
-If not set, the default configuration is `["opened", "reopened", "ready_for_review", "review_requested"]`
-
-Adding `"synchronize"` to `pr_actions` enables automatic tools on new commits pushed to an open PR. You must also add `synchronize` to the workflow `pull_request: types:` list.
-
-`github_action_config.handle_push_trigger` controls whether synchronize events run the push commands (default `false`). Settings fall back to `github_app.*` if not set under `github_action_config`.
+`github_action_config.handle_push_trigger` controls whether synchronize events run the push commands (default `false`). Settings fall back to `github_app.*` if not set under `github_action_config`. Since it defaults to `false`, synchronize is opt-in — you must explicitly enable it by either adding `"synchronize"` to `pr_actions` or setting `handle_push_trigger = true`.
 
 `github_action_config.push_commands` defines which tools run on synchronize events when `handle_push_trigger` is enabled (fallback to `github_app.push_commands`).
 
