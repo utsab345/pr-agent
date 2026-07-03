@@ -413,6 +413,8 @@ class GithubProvider(GitProvider):
             },
         }
         existing_id = self._check_run_ids.get(name)
+        if not existing_id:
+            existing_id = self._find_existing_check_run(check_run_name, self.last_commit_id.sha)
         if existing_id:
             try:
                 self.pr._requester.requestJsonAndCheck(
@@ -420,11 +422,12 @@ class GithubProvider(GitProvider):
                     f"{self.base_url}/repos/{self.repo}/check-runs/{existing_id}",
                     input=update_body,
                 )
+                self._check_run_ids[name] = existing_id
                 return True
             except Exception:
                 get_logger().warning(f"Failed to update check run {existing_id}, creating new one")
         try:
-            data = self.pr._requester.requestJsonAndCheck(
+            headers, data = self.pr._requester.requestJsonAndCheck(
                 "POST",
                 f"{self.base_url}/repos/{self.repo}/check-runs",
                 input=create_body,
@@ -434,6 +437,19 @@ class GithubProvider(GitProvider):
         except Exception:
             get_logger().warning(f"Failed to create check run, falling back to comment")
             return False
+
+    def _find_existing_check_run(self, check_run_name: str, head_sha: str) -> Optional[int]:
+        try:
+            headers, data = self.pr._requester.requestJsonAndCheck(
+                "GET",
+                f"{self.base_url}/repos/{self.repo}/commits/{head_sha}/check-runs",
+            )
+            for run in data.get("check_runs", []):
+                if run.get("name") == check_run_name:
+                    return run["id"]
+        except Exception:
+            get_logger().warning("Failed to look up existing check runs")
+        return None
 
     def publish_comment(self, pr_comment: str, is_temporary: bool = False):
         if not self.pr and not self.issue_main:
