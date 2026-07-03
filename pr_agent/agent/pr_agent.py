@@ -53,10 +53,6 @@ class PRAgent:
         self.ai_handler = ai_handler  # will be initialized in run_action
 
     async def _handle_request(self, pr_url, request, notify=None) -> bool:
-        # First, apply repo specific settings if exists
-        apply_repo_settings(pr_url)
-
-        # Then, apply user specific settings if exists
         if isinstance(request, str):
             request = request.replace("'", "\\'")
             lexer = shlex.shlex(request, posix=True)
@@ -73,8 +69,12 @@ class PRAgent:
             )
             return False
 
-        # Update settings from args
+        # Update settings from args before apply_repo_settings,
+        # so that --config.git_provider=gitlab is effective for provider creation
         args = update_settings_from_args(args)
+
+        # First, apply repo specific settings if exists
+        apply_repo_settings(pr_url)
 
         # Append the response language in the extra instructions
         response_language = get_settings().config.get('response_language', 'en-us')
