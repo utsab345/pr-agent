@@ -23,11 +23,29 @@ class PRUpdateChangelog:
     def __init__(self, pr_url: str, cli_mode=False, args=None, ai_handler: partial[BaseAiHandler,] = LiteLLMAIHandler):
 
         self.git_provider = get_git_provider()(pr_url)
-        self.main_language = get_main_pr_language(
-            self.git_provider.get_languages(), self.git_provider.get_files()
-        )
-        self.commit_changelog = get_settings().pr_update_changelog.push_changelog_changes
-        self._get_changelog_file()  # self.changelog_file_str
+
+        # Skip expensive provider reads when push is disabled or restricted
+        self.push_changelog_changes = get_settings().pr_update_changelog.push_changelog_changes
+        if self.push_changelog_changes:
+            if not hasattr(self.git_provider, "create_or_update_pr_file"):
+                self._skip_push = "not supported"
+            elif not self.git_provider.is_supported("push_code"):
+                self._skip_push = "restricted"
+            else:
+                self._skip_push = None
+        else:
+            self._skip_push = None
+
+        if self._skip_push:
+            self.main_language = None
+            self.changelog_file_str = ""
+        else:
+            self.main_language = get_main_pr_language(
+                self.git_provider.get_languages(), self.git_provider.get_files()
+            )
+            self._get_changelog_file()  # self.changelog_file_str
+
+        self.commit_changelog = self.push_changelog_changes
 
         self.ai_handler = ai_handler()
         self.ai_handler.main_pr_language = self.main_language
@@ -42,7 +60,7 @@ class PRUpdateChangelog:
             "language": self.main_language,
             "diff": "",  # empty diff for initial calculation
             "pr_link": "",
-            "changelog_file_str": self.changelog_file_str,
+            "changelog_file_str": self.changelog_file_str if not self._skip_push else "",
             "today": date.today(),
             "extra_instructions": get_settings().pr_update_changelog.extra_instructions,
             "commit_messages_str": self.git_provider.get_commit_messages(),
@@ -54,30 +72,20 @@ class PRUpdateChangelog:
 
     async def run(self):
         get_logger().info('Updating the changelog...')
+
+        # check if the git provider supports pushing changelog changes
+        if self._skip_push:
+            reason = "not supported" if self._skip_push == "not supported" else "restricted by configuration"
+            get_logger().error(f"Pushing changelog changes is {reason}")
+            if get_settings().config.publish_output:
+                self.git_provider.publish_comment(
+                    f"Pushing changelog changes is {reason}"
+                )
+            return
+
         relevant_configs = {'pr_update_changelog': dict(get_settings().pr_update_changelog),
                             'config': dict(get_settings().config)}
         get_logger().debug("Relevant configs", artifacts=relevant_configs)
-
-        # check if the git provider supports pushing changelog changes
-        if get_settings().pr_update_changelog.push_changelog_changes:
-            if not hasattr(self.git_provider, "create_or_update_pr_file"):
-                get_logger().error(
-                    "Pushing changelog changes is not currently supported for this code platform"
-                )
-                if get_settings().config.publish_output:
-                    self.git_provider.publish_comment(
-                        "Pushing changelog changes is not currently supported for this code platform"
-                    )
-                return
-            if not self.git_provider.is_supported("push_code"):
-                get_logger().error(
-                    "Pushing changelog changes is restricted by configuration"
-                )
-                if get_settings().config.publish_output:
-                    self.git_provider.publish_comment(
-                        "Pushing changelog changes is restricted by configuration"
-                    )
-                return
 
         if get_settings().config.publish_output:
             self.git_provider.publish_comment("Preparing changelog updates...", is_temporary=True)

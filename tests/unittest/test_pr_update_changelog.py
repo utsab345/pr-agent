@@ -139,22 +139,22 @@ class TestPRUpdateChangelog:
         assert "to commit the new content" in answer
 
     @pytest.mark.asyncio
-    async def test_run_without_push_support(self, changelog_tool, mock_git_provider):
+    async def test_run_without_push_support(self, mock_git_provider, mock_ai_handler):
         """Test running changelog update when git provider doesn't support pushing."""
-        # Arrange
-        delattr(mock_git_provider, 'create_or_update_pr_file')  # Remove the method
-        changelog_tool.commit_changelog = True
-        
-        with patch('pr_agent.tools.pr_update_changelog.get_settings') as mock_settings:
+        delattr(mock_git_provider, 'create_or_update_pr_file')
+        with patch('pr_agent.tools.pr_update_changelog.get_git_provider', return_value=lambda url: mock_git_provider), \
+             patch('pr_agent.tools.pr_update_changelog.get_settings') as mock_settings:
             mock_settings.return_value.pr_update_changelog.push_changelog_changes = True
             mock_settings.return_value.config.publish_output = True
-            
-            # Act
-            await changelog_tool.run()
-            
-            # Assert
+            mock_settings.return_value.pr_update_changelog.extra_instructions = ""
+            mock_settings.return_value.pr_update_changelog_prompt.system = ""
+            mock_settings.return_value.pr_update_changelog_prompt.user = ""
+            tool = PRUpdateChangelog("https://example.com/pr/123")
+
+            await tool.run()
+
             mock_git_provider.publish_comment.assert_called_once()
-            assert "not currently supported" in str(mock_git_provider.publish_comment.call_args)
+            assert "not supported" in str(mock_git_provider.publish_comment.call_args)
 
     @pytest.mark.asyncio
     async def test_run_with_push_support(self, changelog_tool, mock_git_provider):
