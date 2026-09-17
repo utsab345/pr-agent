@@ -874,7 +874,7 @@ async def extract_tickets(git_provider):
                                 get_logger().warning(f"Failed to fetch sub-issue content for {sub_issue_url}: {e}")
 
                     except Exception as e:
-                        get_logger().warning(f"Failed to fetch sub-issues for {ticket}: {e}")
+                        get_logger().warning(f"Failed to fetch sub-issues for {ticket!r}: {e}")
 
                     # Extract labels
                     labels = []
