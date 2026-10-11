@@ -788,7 +788,7 @@ def try_fix_json(review, max_iter=10, code_suggestions=False):
     return data
 
 
-def fix_json_escape_char(json_message=None):
+def fix_json_escape_char(json_message=None, max_iterations: int = 100):
     """
     Fix broken or incomplete JSON messages and return the parsed JSON data.
 
@@ -805,13 +805,21 @@ def fix_json_escape_char(json_message=None):
     try:
         result = json.loads(json_message)
     except Exception as e:
-        # Find the offending character index:
-        idx_to_replace = int(str(e).split(' ')[-1].replace(')', ''))
+        if max_iterations <= 0:
+            return {}
+        # Find the offending character index, and give up when that position is missing
+        # or out of range: the reported index is the parse position, not a promise.
+        position = re.search(r"\(char (\d+)\)", str(e))
+        if position is None:
+            return {}
+        idx_to_replace = int(position.group(1))
+        if idx_to_replace >= len(json_message):
+            return {}
         # Remove the offending character:
         json_message = list(json_message)
         json_message[idx_to_replace] = ' '
         new_message = ''.join(json_message)
-        return fix_json_escape_char(json_message=new_message)
+        return fix_json_escape_char(json_message=new_message, max_iterations=max_iterations - 1)
     return result
 
 

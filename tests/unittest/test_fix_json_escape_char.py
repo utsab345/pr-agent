@@ -19,3 +19,15 @@ class TestFixJsonEscapeChar:
         text = '{"x": "A\x02B\x03C"}'
         expected_output = {"x": "A B C"}
         assert fix_json_escape_char(text) == expected_output
+
+    def test_trailing_comma(self):
+        """Return gracefully instead of raising on unrepairable JSON"""
+        assert fix_json_escape_char('{"a": 1,}') == {}
+
+    def test_missing_closing_brace(self):
+        """Return gracefully instead of raising on unrepairable JSON"""
+        assert fix_json_escape_char('{"a": 1') == {}
+
+    def test_unterminated_escape(self):
+        """Return gracefully instead of raising on unrepairable JSON"""
+        assert fix_json_escape_char('{"a": "\\"}') == {}
