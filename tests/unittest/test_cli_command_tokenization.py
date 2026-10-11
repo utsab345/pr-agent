@@ -68,6 +68,10 @@ def _tokenize_like_string_request(command):
             ['--pr_reviewer.extra_instructions="true"'],
         ),
         (
+            '/review --pr_reviewer.extra_instructions="Be \\"strict\\": x"',
+            ['--pr_reviewer.extra_instructions="Be \\"strict\\": x"'],
+        ),
+        (
             '/review --pr_reviewer.extra_instructions="yes, be strict"',
             ["--pr_reviewer.extra_instructions=yes, be strict"],
         ),
@@ -92,7 +96,7 @@ def settings_snapshot():
     from pr_agent.config_loader import get_settings
 
     settings = get_settings()
-    keys = ["pr_reviewer.extra_instructions", "pr_reviewer.num_max_findings"]
+    keys = ["pr_reviewer.extra_instructions", "pr_reviewer.num_max_findings", "ignore.glob"]
     saved = {key: settings.get(key, None) for key in keys}
     yield settings
     for key, value in saved.items():
@@ -100,20 +104,36 @@ def settings_snapshot():
 
 
 @pytest.mark.parametrize(
-    ("value", "expected"),
+    ("argument", "key", "expected"),
     [
-        ("Note: be strict", "Note: be strict"),
-        ("true", "true"),
-        ("no", "no"),
+        ('--pr_reviewer.extra_instructions="Note: be strict"', "pr_reviewer.extra_instructions", "Note: be strict"),
+        ('--pr_reviewer.extra_instructions="true"', "pr_reviewer.extra_instructions", "true"),
+        ('--pr_reviewer.extra_instructions="no"', "pr_reviewer.extra_instructions", "no"),
+        ('--pr_reviewer.extra_instructions="Be \\"strict\\": x"', "pr_reviewer.extra_instructions", 'Be "strict": x'),
+        ("--ignore.glob=\"['*.py']\"", "ignore.glob", ["*.py"]),
+        ("'twas", "pr_reviewer.num_max_findings", 3),
     ],
 )
-def test_string_request_applies_quoted_overrides_as_strings(settings_snapshot, value, expected):
-    from pr_agent.algo.utils import update_settings_from_args
+async def test_string_request_applies_quoted_overrides(monkeypatch, settings_snapshot, argument, key, expected):
+    from unittest.mock import AsyncMock
 
-    _, quoted_args = _tokenize_like_string_request(
-        f'/review --pr_reviewer.extra_instructions="{value}" --pr_reviewer.num_max_findings=3'
-    )
-    update_settings_from_args(quoted_args)
+    import pr_agent.agent.pr_agent as agent_module
 
-    assert settings_snapshot.get("pr_reviewer.extra_instructions") == expected
+    review = Mock(return_value=AsyncMock())
+
+    async def run_sync(func):
+        func()
+
+    monkeypatch.setattr(agent_module, "apply_repo_settings", lambda pr_url: None)
+    monkeypatch.setattr(agent_module, "enforce_request_policy", lambda pr_url: None)
+    # Keep telemetry cleanup off the thread pool so the test loop can close promptly.
+    monkeypatch.setattr(agent_module, "flush_telemetry", lambda: None)
+    monkeypatch.setattr(agent_module.asyncio, "to_thread", run_sync)
+    monkeypatch.setitem(agent_module.command2class, "review", review)
+
+    command = f"/review {argument} --pr_reviewer.num_max_findings=3"
+    assert await agent_module.PRAgent().handle_request("https://github.com/org/repo/pull/1", command) is True
+
+    review.assert_called_once()
+    assert settings_snapshot.get(key) == expected
     assert settings_snapshot.get("pr_reviewer.num_max_findings") == 3
