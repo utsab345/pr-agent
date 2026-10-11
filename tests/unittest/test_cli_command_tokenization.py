@@ -1,10 +1,10 @@
 import shlex
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from pr_agent import cli
-from pr_agent.agent.pr_agent import _reencode_quoted_setting_args
+from pr_agent.agent import pr_agent as agent_module
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def _tokenize_like_string_request(command):
     lexer.quotes = '"'
     lexer.commenters = ''
     action, *args = list(lexer)
-    return action, _reencode_quoted_setting_args(command, args)
+    return action, agent_module._reencode_quoted_setting_args(command, args)
 
 
 @pytest.mark.parametrize(
@@ -115,10 +115,6 @@ def settings_snapshot():
     ],
 )
 async def test_string_request_applies_quoted_overrides(monkeypatch, settings_snapshot, argument, key, expected):
-    from unittest.mock import AsyncMock
-
-    import pr_agent.agent.pr_agent as agent_module
-
     review = Mock(return_value=AsyncMock())
 
     async def run_sync(func):
