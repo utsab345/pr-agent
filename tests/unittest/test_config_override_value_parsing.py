@@ -5,12 +5,15 @@ The fallback logs at DEBUG - the level every webhook server runs at, because
 `configuration.toml` ships `log_level="DEBUG"` - so the log call is on the hot path for any
 value YAML rejects.
 """
+import copy
+
 import pytest
 
 import pr_agent.agent.pr_agent as agent_module
 from pr_agent.algo.utils import update_settings_from_args
 from pr_agent.config_loader import get_settings
 from pr_agent.log import setup_logger
+from tests.unittest._settings_helpers import restore_settings
 
 PR_URL = "https://github.com/org/repo/pull/1"
 
@@ -66,6 +69,21 @@ def test_a_parseable_value_is_still_converted(monkeypatch, debug_logging):
     update_settings_from_args(["--pr_reviewer.num_max_findings=5"])
 
     assert settings.pr_reviewer.num_max_findings == 5
+
+
+def test_section_mapping_override_preserves_unspecified_settings(debug_logging):
+    settings = get_settings()
+    github_key = next(key for key in settings.as_dict() if key.lower() == "github")
+    snapshot = {"github": copy.deepcopy(settings.as_dict()[github_key])}
+
+    try:
+        update_settings_from_args(["--github={publish_as_check_run: true}"])
+
+        assert settings.get("github.publish_as_check_run") is True
+        assert settings.get("github.base_url") == snapshot["github"]["base_url"]
+        assert settings.get("github.deployment_type") == snapshot["github"]["deployment_type"]
+    finally:
+        restore_settings(snapshot)
 
 
 async def test_a_braced_instruction_reaches_the_tool(monkeypatch, debug_logging, review_tool):

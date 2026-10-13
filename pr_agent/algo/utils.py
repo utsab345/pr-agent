@@ -787,11 +787,34 @@ def update_settings_from_args(args: List[str]) -> List[str]:
                     other_args.append(arg)
                     continue
                 key, value = _fix_key_value(*vals)
+                if "." not in key and isinstance(value, dict):
+                    settings_data = get_settings().as_dict()
+                    section_name = next(
+                        (name for name in settings_data if name.lower() == key.lower()), key
+                    )
+                    current_section = copy.deepcopy(settings_data.get(section_name, {}))
+                    if not isinstance(current_section, dict):
+                        current_section = {}
+                    value = _merge_settings_mapping(current_section, value)
                 get_settings().set(key, value)
                 get_logger().info(f'Updated setting {key} to: "{value}"')
             else:
                 other_args.append(arg)
     return other_args
+
+
+def _merge_settings_mapping(current: dict, updates: dict) -> dict:
+    """Merge a section-level CLI mapping without dropping unspecified settings."""
+    for key, value in updates.items():
+        existing_key = next((item for item in current if item.lower() == key.lower()), key)
+        existing_value = current.get(existing_key)
+        if isinstance(existing_value, dict) and isinstance(value, dict):
+            current[existing_key] = _merge_settings_mapping(existing_value, value)
+        else:
+            if existing_key != key:
+                current.pop(existing_key, None)
+            current[key] = value
+    return current
 
 
 def _fix_key_value(key: str, value: str):

@@ -116,7 +116,6 @@ FORBIDDEN_ARGS = [
     "--pr_questions.resolve_threads=true",
     "--pr_similar_issue.force_update_dataset=true",
     "--pr_similar_issue={force_update_dataset: true, vectordb: qdrant}",
-    "--pr_similar_issue={vectordb: qdrant, max_issues_to_scan: 50}",
     "--config.branch_issue_regex=^([\\w/.-]+)*!$",
     "--ignore.regex=^([\\w/.-]+)*!$",
     "--config.output_relevant_configurations=true",
@@ -145,9 +144,12 @@ ALLOWED_ARGS_SINGLE = [
     "--pr_description.publish_labels=false",
     # a mapping value whose nested keys are all allowed stays accepted
     "--qdrant={timeout: 5, prefer_grpc: true}",
+    "--pr_similar_issue={vectordb: qdrant, max_issues_to_scan: 50}",
     "--pr_similar_issue.max_issues_to_scan=50",
     "--github.publish_as_check_run=true",
+    "--github={publish_as_check_run: true}",
     "--gitlab.handle_push_trigger=true",
+    "--gitlab={handle_push_trigger: true}",
     "--bitbucket.identity_request_timeout=10",
     "--gitea.handle_push_trigger=true",
     # non-flag arguments are not validated against the forbidden list
