@@ -29,12 +29,13 @@ from pr_agent.git_providers.gitlab_provider import (
 )
 
 
-def _mock_settings(publish_review_as_thread=False, resolve_outdated_inline_threads=False):
+def _mock_settings(publish_review_as_thread=False, resolve_outdated_inline_threads=False, **values):
     """Settings stub whose .get() returns the GitLab thread flags and passes other keys through to the default."""
     settings = MagicMock()
     settings.get.side_effect = lambda key, default=None: {
         "GITLAB.PUBLISH_REVIEW_AS_THREAD": publish_review_as_thread,
         "GITLAB.RESOLVE_OUTDATED_INLINE_THREADS": resolve_outdated_inline_threads,
+        **values,
     }.get(key, default)
     return settings
 
@@ -780,6 +781,19 @@ class TestGitLabProvider:
 
         m_cmp.assert_called_once_with("group/new/a", "aaa1111", "bbb2222")
 
+    def test_expand_submodule_changes_skips_lookup_for_false_string_setting(self, gitlab_provider):
+        settings = MagicMock()
+        settings.get.side_effect = lambda key, default=None: {
+            "GITLAB.EXPAND_SUBMODULE_DIFFS": "false",
+        }.get(key, default)
+
+        with patch("pr_agent.git_providers.gitlab_provider.get_settings", return_value=settings), \
+             patch.object(gitlab_provider, "_get_gitmodules_map") as m_gitmodules:
+            changes = [self._submodule_bump()]
+            assert gitlab_provider._expand_submodule_changes(changes) == changes
+
+        m_gitmodules.assert_not_called()
+
     def test_project_by_path_requires_exact_match(self, gitlab_provider):
         gitlab_provider.gl.projects.get.reset_mock()
         gitlab_provider.gl.projects.get.side_effect = GitlabGetError("not found")
@@ -1059,6 +1073,24 @@ class TestGitLabProvider:
         with patch("pr_agent.git_providers.gitlab_provider.get_settings",
                    return_value=_mock_settings(publish_review_as_thread=configured)):
             assert gitlab_provider.should_publish_review_as_thread() is configured
+
+    @pytest.mark.parametrize(
+        "configured,expected",
+        [(1, True), (0, False), ("1", True), ("0", False), ("FALSE", False)],
+    )
+    def test_gitlab_boolean_settings_parse_numeric_and_string_values(self, gitlab_provider, configured, expected):
+        settings = _mock_settings(
+            publish_review_as_thread=configured,
+            **{
+                "GITLAB.PUBLISH_IMPROVE_AS_THREAD": configured,
+                "GITLAB.REPLY_TO_TRIGGER_COMMENT": configured,
+                "GITLAB.EXPAND_SUBMODULE_DIFFS": configured,
+            },
+        )
+        with patch("pr_agent.git_providers.gitlab_provider.get_settings", return_value=settings):
+            assert gitlab_provider.should_publish_review_as_thread() is expected
+            assert gitlab_provider.should_publish_improve_as_thread() is expected
+            assert gitlab_provider.should_reply_to_trigger_comment() is expected
 
     def test_should_publish_review_as_thread_defaults_false(self, gitlab_provider):
         # Key absent -> default False (the feature is opt-in).
