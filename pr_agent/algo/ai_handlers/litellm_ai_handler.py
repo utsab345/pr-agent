@@ -34,6 +34,7 @@ from pr_agent.config_loader import get_settings, get_verbosity_level
 from pr_agent.log import get_logger
 
 MODEL_RETRIES = 2
+MAX_CONFIG_NUM_RETRIES = 10
 DUMMY_LITELLM_API_KEY = "dummy_key"  # placeholder set when no OpenAI key is configured
 _IMAGE_HEAD_TIMEOUT_SECONDS = 5
 
@@ -65,6 +66,11 @@ def _configured_client_retries():
     if parsed < 0:
         get_logger().warning(f"Ignoring negative config.num_retries: {parsed}")
         return None
+    if parsed > MAX_CONFIG_NUM_RETRIES:
+        get_logger().warning(
+            f"Clamping config.num_retries from {parsed} to {MAX_CONFIG_NUM_RETRIES}"
+        )
+        return MAX_CONFIG_NUM_RETRIES
     return parsed
 
 

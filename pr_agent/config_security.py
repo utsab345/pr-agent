@@ -29,5 +29,6 @@ REPO_OVERRIDABLE_KEYS_BY_HOST_SECTION = {
 # host-only. publish_error_details controls what service-side failure state is
 # disclosed in a PR comment, so the PR author must not be able to enable it.
 REPO_HOST_ONLY_KEYS_BY_SECTION = {
+    "config": frozenset({"num_retries"}),
     "pr_reviewer": frozenset({"publish_error_details"}),
 }

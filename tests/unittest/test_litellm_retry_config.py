@@ -84,3 +84,8 @@ class TestConfiguredClientRetries:
     def test_invalid_values_are_ignored_not_raised(self, value):
         get_settings().set("config.num_retries", value)
         assert _configured_client_retries() is None
+
+    @pytest.mark.parametrize("value,expected", [(11, 10), (100, 10), ("15", 10)])
+    def test_excessive_values_are_clamped(self, value, expected):
+        get_settings().set("config.num_retries", value)
+        assert _configured_client_retries() == expected
